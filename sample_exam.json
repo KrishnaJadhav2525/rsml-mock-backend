@@ -1,12 +1,13 @@
 {
   "exam": {
     "id": 101,
-    "exam_name": "BSC CA - Practice Mock Examination",
-    "subject": "Data Structures & Computer Science",
+    "exam_id": 101,
+    "exam_name": "BSC CA - Computer Science Mock Examination (2 Marks Each)",
+    "subject": "Computer Science & Application Core",
     "start_time": "2026-09-24T00:00:00Z",
-    "end_time": "2026-10-30T23:59:59Z",
-    "duration_minutes": 60,
-    "total_questions": 5,
+    "end_time": "2026-10-31T23:59:59Z",
+    "duration_minutes": 30,
+    "total_questions": 10,
     "status": "ONGOING",
     "passcode_required": true,
     "passcode": "123456"
@@ -15,56 +16,111 @@
     {
       "id": 1,
       "question_id": 1,
-      "question_text": "<p>What is the worst-case time complexity of searching an element in an unbalanced Binary Search Tree (BST)?</p>",
+      "question_text": "<p><strong>Q1 [2 Marks]:</strong> What is the worst-case time complexity of searching for a key in an unbalanced Binary Search Tree (BST) with $n$ elements?</p>",
       "options": [
-        {"id": "opt1_a", "label": "A", "text": "O(1)"},
-        {"id": "opt1_b", "label": "B", "text": "O(log n)"},
-        {"id": "opt1_c", "label": "C", "text": "O(n)"},
-        {"id": "opt1_d", "label": "D", "text": "O(n log n)"}
+        {"id": "opt1_a", "label": "A", "text": "$\\mathcal{O}(1)$"},
+        {"id": "opt1_b", "label": "B", "text": "$\\mathcal{O}(\\log n)$"},
+        {"id": "opt1_c", "label": "C", "text": "$\\mathcal{O}(n)$"},
+        {"id": "opt1_d", "label": "D", "text": "$\\mathcal{O}(n \\log n)$"}
       ]
     },
     {
       "id": 2,
       "question_id": 2,
-      "question_text": "<p>Evaluate the definite integral using standard calculus rules:</p><p>$$\\int_{0}^{2} (3x^2 + 2x) \\, dx$$</p>",
+      "question_text": "<p><strong>Q2 [2 Marks]:</strong> In relational database management systems (RDBMS), which normal form requires that for every non-trivial functional dependency $X \\rightarrow Y$, $X$ must be a super key?</p>",
       "options": [
-        {"id": "opt2_a", "label": "A", "text": "10"},
-        {"id": "opt2_b", "label": "B", "text": "12"},
-        {"id": "opt2_c", "label": "C", "text": "14"},
-        {"id": "opt2_d", "label": "D", "text": "16"}
+        {"id": "opt2_a", "label": "A", "text": "First Normal Form (1NF)"},
+        {"id": "opt2_b", "label": "B", "text": "Second Normal Form (2NF)"},
+        {"id": "opt2_c", "label": "C", "text": "Third Normal Form (3NF)"},
+        {"id": "opt2_d", "label": "D", "text": "Boyce-Codd Normal Form (BCNF)"}
       ]
     },
     {
       "id": 3,
       "question_id": 3,
-      "question_text": "<p>In relational database management systems (RDBMS), which normal form eliminates transitive functional dependencies?</p>",
+      "question_text": "<p><strong>Q3 [2 Marks]:</strong> Which of the following CPU scheduling algorithms is strictly non-preemptive in an Operating System?</p>",
       "options": [
-        {"id": "opt3_a", "label": "A", "text": "First Normal Form (1NF)"},
-        {"id": "opt3_b", "label": "B", "text": "Second Normal Form (2NF)"},
-        {"id": "opt3_c", "label": "C", "text": "Third Normal Form (3NF)"},
-        {"id": "opt3_d", "label": "D", "text": "Boyce-Codd Normal Form (BCNF)"}
+        {"id": "opt3_a", "label": "A", "text": "Round Robin (RR)"},
+        {"id": "opt3_b", "label": "B", "text": "First-Come, First-Served (FCFS)"},
+        {"id": "opt3_c", "label": "C", "text": "Shortest Remaining Time First (SRTF)"},
+        {"id": "opt3_d", "label": "D", "text": "Priority Scheduling with preemption enabled"}
       ]
     },
     {
       "id": 4,
       "question_id": 4,
-      "question_text": "<p>Which of the following scheduling algorithms in an Operating System is non-preemptive?</p>",
+      "question_text": "<p><strong>Q4 [2 Marks]:</strong> In computer networking, at which layer of the OSI model does the Address Resolution Protocol (ARP) primarily operate to map IP addresses to MAC addresses?</p>",
       "options": [
-        {"id": "opt4_a", "label": "A", "text": "Round Robin (RR)"},
-        {"id": "opt4_b", "label": "B", "text": "Shortest Job First (SJF - Non-Preemptive)"},
-        {"id": "opt4_c", "label": "C", "text": "Shortest Remaining Time First (SRTF)"},
-        {"id": "opt4_d", "label": "D", "text": "Priority Scheduling with Preemption"}
+        {"id": "opt4_a", "label": "A", "text": "Data Link Layer (Layer 2)"},
+        {"id": "opt4_b", "label": "B", "text": "Network Layer (Layer 3)"},
+        {"id": "opt4_c", "label": "C", "text": "Transport Layer (Layer 4)"},
+        {"id": "opt4_d", "label": "D", "text": "Application Layer (Layer 7)"}
       ]
     },
     {
       "id": 5,
       "question_id": 5,
-      "question_text": "<p>In React Native, which hook should be used to memoize expensive computations between re-renders?</p>",
+      "question_text": "<p><strong>Q5 [2 Marks]:</strong> What is the recurrence relation for the standard Merge Sort algorithm on an input array of size $n$?</p>",
       "options": [
-        {"id": "opt5_a", "label": "A", "text": "useEffect"},
-        {"id": "opt5_b", "label": "B", "text": "useMemo"},
-        {"id": "opt5_c", "label": "C", "text": "useCallback"},
-        {"id": "opt5_d", "label": "D", "text": "useRef"}
+        {"id": "opt5_a", "label": "A", "text": "$T(n) = T(n-1) + \\mathcal{O}(1)$"},
+        {"id": "opt5_b", "label": "B", "text": "$T(n) = 2T(n/2) + \\mathcal{O}(n)$"},
+        {"id": "opt5_c", "label": "C", "text": "$T(n) = 2T(n/2) + \\mathcal{O}(1)$"},
+        {"id": "opt5_d", "label": "D", "text": "$T(n) = T(n/2) + \\mathcal{O}(n)$"}
+      ]
+    },
+    {
+      "id": 6,
+      "question_id": 6,
+      "question_text": "<p><strong>Q6 [2 Marks]:</strong> In Object-Oriented Programming (OOP), what mechanism allows a subclass to provide a specific implementation of a method that is already provided by its superclass at runtime?</p>",
+      "options": [
+        {"id": "opt6_a", "label": "A", "text": "Method Overloading (Compile-time Polymorphism)"},
+        {"id": "opt6_b", "label": "B", "text": "Method Overriding (Runtime Dynamic Binding)"},
+        {"id": "opt6_c", "label": "C", "text": "Encapsulation"},
+        {"id": "opt6_d", "label": "D", "text": "Information Hiding"}
+      ]
+    },
+    {
+      "id": 7,
+      "question_id": 7,
+      "question_text": "<p><strong>Q7 [2 Marks]:</strong> Which of the following HTTP request methods is defined as <em>idempotent</em> according to the RFC 7231 specification?</p>",
+      "options": [
+        {"id": "opt7_a", "label": "A", "text": "POST"},
+        {"id": "opt7_b", "label": "B", "text": "PUT"},
+        {"id": "opt7_c", "label": "C", "text": "PATCH"},
+        {"id": "opt7_d", "label": "D", "text": "CONNECT"}
+      ]
+    },
+    {
+      "id": 8,
+      "question_id": 8,
+      "question_text": "<p><strong>Q8 [2 Marks]:</strong> In Operating Systems, the Banker's Algorithm is primarily used for which critical synchronization problem?</p>",
+      "options": [
+        {"id": "opt8_a", "label": "A", "text": "Deadlock Prevention"},
+        {"id": "opt8_b", "label": "B", "text": "Deadlock Avoidance"},
+        {"id": "opt8_c", "label": "C", "text": "Deadlock Detection and Recovery"},
+        {"id": "opt8_d", "label": "D", "text": "Mutual Exclusion without busy waiting"}
+      ]
+    },
+    {
+      "id": 9,
+      "question_id": 9,
+      "question_text": "<p><strong>Q9 [2 Marks]:</strong> What is the maximum number of nodes in a binary tree of height $h$, where height is defined as the number of levels starting from level 1?</p>",
+      "options": [
+        {"id": "opt9_a", "label": "A", "text": "$2^h - 1$"},
+        {"id": "opt9_b", "label": "B", "text": "$2^{h-1}$"},
+        {"id": "opt9_c", "label": "C", "text": "$2^{h+1} - 1$"},
+        {"id": "opt9_d", "label": "D", "text": "$2h$"}
+      ]
+    },
+    {
+      "id": 10,
+      "question_id": 10,
+      "question_text": "<p><strong>Q10 [2 Marks]:</strong> In transactional databases, which ACID property guarantees that all operations within a transaction are completed successfully, or none of them are reflected in the database?</p>",
+      "options": [
+        {"id": "opt10_a", "label": "A", "text": "Atomicity"},
+        {"id": "opt10_b", "label": "B", "text": "Consistency"},
+        {"id": "opt10_c", "label": "C", "text": "Isolation"},
+        {"id": "opt10_d", "label": "D", "text": "Durability"}
       ]
     }
   ]

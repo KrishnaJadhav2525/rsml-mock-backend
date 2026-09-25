@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timezone
@@ -9,8 +10,8 @@ import os
 
 app = FastAPI(
     title="RSML Mock Exam Practice Backend",
-    description="Separate practice exam backend for RSML Online Exam application",
-    version="1.0.0"
+    description="Separate practice exam backend for RSML Online Exam application with device and session tracking",
+    version="1.1.0"
 )
 
 # Enable CORS for all mobile and web clients
@@ -29,7 +30,10 @@ def load_data():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if "devices" not in data:
+                    data["devices"] = {}
+                return data
         except Exception:
             pass
     return {
@@ -107,6 +111,7 @@ def load_data():
                 }
             ]
         },
+        "devices": {},
         "submissions": []
     }
 
@@ -172,7 +177,9 @@ def health_check():
         "service": "RSML Mock Exam Backend",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "total_exams": len(DB["exams"]),
-        "admin_docs": "/docs"
+        "registered_phones": len(DB.get("devices", {})),
+        "admin_dashboard": "/admin/devices",
+        "swagger_docs": "/docs"
     }
 
 @app.get("/api/mobile/server-time")
@@ -184,9 +191,45 @@ def get_server_time():
     }
 
 @app.post("/api/mobile/auth/login")
-def student_login(payload: LoginRequest):
-    # Mock backend accepts any student ID for practice testing
+def student_login(payload: LoginRequest, request: Request):
     sid = payload.studentID.strip() if payload.studentID else "2406319"
+    
+    # Capture client IP (accounting for Render reverse proxies)
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    
+    dev_id = (payload.deviceId or f"dev_{int(time.time())}").strip()
+    now_str = datetime.now(timezone.utc).isoformat()
+    
+    # Record or update phone in device tracker
+    if "devices" not in DB:
+        DB["devices"] = {}
+        
+    if dev_id in DB["devices"]:
+        d = DB["devices"][dev_id]
+        d["last_seen"] = now_str
+        d["student_id"] = sid
+        d["ip_address"] = client_ip
+        d["login_count"] = d.get("login_count", 1) + 1
+        d["status"] = "Active / Logged In"
+    else:
+        DB["devices"][dev_id] = {
+            "device_id": dev_id,
+            "student_id": sid,
+            "student_name": "KARANDE HARSHAD MAHADEV",
+            "device_brand": payload.deviceBrand or "Android Device",
+            "device_model": payload.deviceModel or "Android Mobile",
+            "ip_address": client_ip,
+            "first_seen": now_str,
+            "last_seen": now_str,
+            "login_count": 1,
+            "status": "Active / Logged In"
+        }
+    
+    save_data()
+
     return {
         "token": f"mock_jwt_session_{sid}_{int(time.time())}",
         "user": {
@@ -227,7 +270,6 @@ def verify_passcode(payload: PasscodeRequest):
 def get_exam_questions(exam_id: str):
     questions = DB["questions"].get(str(exam_id))
     if not questions:
-        # Fallback to first available question set
         first_key = next(iter(DB["questions"]), None)
         questions = DB["questions"][first_key] if first_key else []
     return questions
@@ -244,6 +286,14 @@ def submit_exam_responses(exam_id: str, payload: SubmitRequest):
         "received_at": datetime.now(timezone.utc).isoformat()
     }
     DB["submissions"].append(record)
+    
+    # Update phone status
+    if "devices" in DB:
+        for d in DB["devices"].values():
+            if d.get("student_id") == str(payload.student_id):
+                d["last_seen"] = datetime.now(timezone.utc).isoformat()
+                d["status"] = f"Submitted Exam #{exam_id}"
+                
     save_data()
     return {
         "success": True,
@@ -251,7 +301,116 @@ def submit_exam_responses(exam_id: str, payload: SubmitRequest):
         "exam_id": exam_id
     }
 
-# --- Admin Endpoints (For Populating & Reviewing from Your Laptop) ---
+# --- Admin & Device Tracking Endpoints ---
+
+@app.get("/api/admin/devices")
+def admin_get_devices():
+    return list(DB.get("devices", {}).values())
+
+@app.delete("/api/admin/devices/{device_id}")
+def admin_delete_device(device_id: str):
+    if "devices" in DB and device_id in DB["devices"]:
+        deleted = DB["devices"].pop(device_id)
+        save_data()
+        return {"success": True, "message": f"Device {device_id} removed", "device": deleted}
+    raise HTTPException(status_code=404, detail="Device not found")
+
+@app.get("/admin/devices", response_class=HTMLResponse)
+def admin_devices_web_dashboard():
+    devices = list(DB.get("devices", {}).values())
+    total_devs = len(devices)
+    total_subs = len(DB.get("submissions", []))
+    
+    rows_html = ""
+    for idx, d in enumerate(devices, 1):
+        status_color = "#10b981" if "Active" in d.get("status", "") else "#6366f1"
+        rows_html += f"""
+        <tr>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{idx}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><strong>{d.get('student_id')}</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{d.get('device_brand', 'Android')} - <strong>{d.get('device_model', 'Phone')}</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 12px;">{d.get('device_id')}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: monospace;">{d.get('ip_address')}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><span style="background: {status_color}20; color: {status_color}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{d.get('status', 'Online')}</span></td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">{d.get('last_seen', '').replace('T', ' ')[:19]}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">{d.get('login_count', 1)}</td>
+        </tr>
+        """
+        
+    if not rows_html:
+        rows_html = """<tr><td colspan="8" style="text-align: center; padding: 30px; color: #9ca3af;">No student phones registered yet. Once students open and log into the app, their devices will automatically appear here.</td></tr>"""
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>RSML App Device & Session Monitor</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; margin: 0; padding: 24px; color: #1f2937; }}
+            .container {{ max-width: 1200px; margin: 0 auto; }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }}
+            .card {{ background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }}
+            .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }}
+            .stat-box {{ background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+            .stat-val {{ font-size: 28px; font-weight: bold; color: #023c69; margin-top: 4px; }}
+            table {{ width: 100%; border-collapse: collapse; text-align: left; }}
+            th {{ padding: 12px; background: #f9fafb; font-weight: 600; color: #4b5563; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #e5e7eb; }}
+            .refresh-btn {{ background: #023c69; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div>
+                    <h1 style="margin: 0; color: #023c69;">📱 Student Phone & Device Monitor</h1>
+                    <p style="margin: 4px 0 0 0; color: #6b7280;">Real-time device tracking for RSML Online Exam App</p>
+                </div>
+                <div>
+                    <a href="/admin/devices" class="refresh-btn">🔄 Refresh</a>
+                    <a href="/docs" class="refresh-btn" style="background: #4b5563; margin-left: 8px;">⚙️ API Docs</a>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 13px; font-weight: 600;">INSTALLED PHONES</div>
+                    <div class="stat-val">{total_devs}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 13px; font-weight: 600;">ACTIVE EXAMS</div>
+                    <div class="stat-val">{len(DB.get('exams', []))}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 13px; font-weight: 600;">SUBMISSIONS RECORDED</div>
+                    <div class="stat-val">{total_subs}</div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0; overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Student ID</th>
+                            <th>Phone Brand & Model</th>
+                            <th>Unique Installation ID</th>
+                            <th>Client IP</th>
+                            <th>Session Status</th>
+                            <th>Last Active</th>
+                            <th style="text-align: center;">Logins</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
 @app.post("/api/admin/exams")
 def admin_create_or_update_exam(exam: ExamModel):
@@ -273,7 +432,6 @@ def admin_upload_questions(exam_id: str, questions: List[QuestionModel]):
     q_list = [q.model_dump() for q in questions]
     DB["questions"][str(exam_id)] = q_list
     
-    # Update total questions on matching exam
     matched = next((e for e in DB["exams"] if str(e.get("id")) == str(exam_id)), None)
     if matched:
         matched["total_questions"] = len(q_list)

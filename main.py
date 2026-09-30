@@ -37,80 +37,8 @@ def load_data():
         except Exception:
             pass
     return {
-        "exams": [
-            {
-                "id": 101,
-                "exam_id": 101,
-                "exam_name": "BSC CA - Computer Science Mock Practice Test",
-                "subject": "Data Structures & Computer Applications",
-                "start_time": "2026-09-24T00:00:00Z",
-                "end_time": "2026-10-30T23:59:59Z",
-                "duration_minutes": 60,
-                "total_questions": 5,
-                "status": "ONGOING",
-                "passcode_required": True,
-                "passcode": "123456"
-            }
-        ],
-        "questions": {
-            "101": [
-                {
-                    "id": 1,
-                    "question_id": 1,
-                    "question_text": "<p>What is the worst-case time complexity of searching an element in an unbalanced Binary Search Tree (BST)?</p>",
-                    "options": [
-                        {"id": "opt1_a", "label": "A", "text": "O(1)"},
-                        {"id": "opt1_b", "label": "B", "text": "O(log n)"},
-                        {"id": "opt1_c", "label": "C", "text": "O(n)"},
-                        {"id": "opt1_d", "label": "D", "text": "O(n log n)"}
-                    ]
-                },
-                {
-                    "id": 2,
-                    "question_id": 2,
-                    "question_text": "<p>Evaluate the definite integral using standard calculus rules:</p><p>$$\\int_{0}^{2} (3x^2 + 2x) \\, dx$$</p>",
-                    "options": [
-                        {"id": "opt2_a", "label": "A", "text": "10"},
-                        {"id": "opt2_b", "label": "B", "text": "12"},
-                        {"id": "opt2_c", "label": "C", "text": "14"},
-                        {"id": "opt2_d", "label": "D", "text": "16"}
-                    ]
-                },
-                {
-                    "id": 3,
-                    "question_id": 3,
-                    "question_text": "<p>In relational database management systems (RDBMS), which normal form eliminates transitive functional dependencies?</p>",
-                    "options": [
-                        {"id": "opt3_a", "label": "A", "text": "First Normal Form (1NF)"},
-                        {"id": "opt3_b", "label": "B", "text": "Second Normal Form (2NF)"},
-                        {"id": "opt3_c", "label": "C", "text": "Third Normal Form (3NF)"},
-                        {"id": "opt3_d", "label": "D", "text": "Boyce-Codd Normal Form (BCNF)"}
-                    ]
-                },
-                {
-                    "id": 4,
-                    "question_id": 4,
-                    "question_text": "<p>Which of the following CPU scheduling algorithms in an Operating System is strictly non-preemptive?</p>",
-                    "options": [
-                        {"id": "opt4_a", "label": "A", "text": "Round Robin (RR)"},
-                        {"id": "opt4_b", "label": "B", "text": "Shortest Job First (Non-Preemptive SJF)"},
-                        {"id": "opt4_c", "label": "C", "text": "Shortest Remaining Time First (SRTF)"},
-                        {"id": "opt4_d", "label": "D", "text": "Preemptive Priority Scheduling"}
-                    ]
-                },
-                {
-                    "id": 5,
-                    "question_id": 5,
-                    "question_text": "<p>In React Native, which hook is used to memoize expensive computations across re-renders?</p>",
-                    "options": [
-                        {"id": "opt5_a", "label": "A", "text": "useEffect"},
-                        {"id": "opt5_b", "label": "B", "text": "useMemo"},
-                        {"id": "opt5_c", "label": "C", "text": "useCallback"},
-                        {"id": "opt5_d", "label": "D", "text": "useRef"}
-                    ]
-                }
-            ]
-        },
+        "exams": [],
+        "questions": {},
         "devices": {},
         "submissions": []
     }
@@ -438,6 +366,23 @@ def admin_upload_questions(exam_id: str, questions: List[QuestionModel]):
     
     save_data()
     return {"success": True, "message": f"Uploaded {len(q_list)} questions for exam {exam_id}"}
+
+@app.delete("/api/admin/exams/{exam_id}")
+def admin_delete_exam(exam_id: str):
+    initial_len = len(DB["exams"])
+    DB["exams"] = [e for e in DB["exams"] if str(e.get("id")) != str(exam_id) and str(e.get("exam_id")) != str(exam_id)]
+    if str(exam_id) in DB["questions"]:
+        del DB["questions"][str(exam_id)]
+    save_data()
+    return {"success": True, "message": f"Exam {exam_id} deleted", "remaining_exams": len(DB["exams"])}
+
+@app.delete("/api/admin/exams")
+@app.post("/api/admin/exams/clear")
+def admin_clear_all_exams():
+    DB["exams"] = []
+    DB["questions"] = {}
+    save_data()
+    return {"success": True, "message": "All mock exams cleared"}
 
 @app.get("/api/admin/submissions")
 def admin_view_submissions(exam_id: Optional[str] = None):

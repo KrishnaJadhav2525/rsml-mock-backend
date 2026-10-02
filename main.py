@@ -96,6 +96,19 @@ class ExamModel(BaseModel):
     passcode_required: bool = False
     passcode: Optional[str] = None
 
+class TelemetryLogModel(BaseModel):
+    event: str
+    level: str = "INFO"
+    details: Dict[str, Any] = Field(default_factory=dict)
+    student_id: Optional[str] = None
+    student_name: Optional[str] = None
+    device_id: Optional[str] = None
+    device_brand: Optional[str] = None
+    device_model: Optional[str] = None
+    os_version: Optional[str] = None
+    app_version: Optional[str] = "1.2.0"
+    timestamp: Optional[str] = None
+
 # --- Mobile Application Endpoints (Matched 1:1) ---
 
 @app.get("/")
@@ -228,6 +241,165 @@ def submit_exam_responses(exam_id: str, payload: SubmitRequest):
         "message": "Exam responses recorded successfully",
         "exam_id": exam_id
     }
+
+# --- Telemetry & Error Logging Endpoints (Exclusively Render) ---
+
+@app.post("/api/telemetry/log")
+def ingest_telemetry_log(payload: TelemetryLogModel, request: Request):
+    if "logs" not in DB:
+        DB["logs"] = []
+    
+    log_entry = payload.model_dump()
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    log_entry["ip_address"] = client_ip
+    if not log_entry.get("timestamp"):
+        log_entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    
+    # Prepend new log and retain up to 2,000 logs
+    DB["logs"].insert(0, log_entry)
+    if len(DB["logs"]) > 2000:
+        DB["logs"] = DB["logs"][:2000]
+    
+    save_data()
+    return {"success": True}
+
+@app.get("/api/admin/logs")
+def admin_get_logs(level: Optional[str] = None, event: Optional[str] = None, limit: int = 200):
+    logs = DB.get("logs", [])
+    if level:
+        logs = [l for l in logs if l.get("level", "").upper() == level.upper()]
+    if event:
+        logs = [l for l in logs if event.lower() in l.get("event", "").lower()]
+    return logs[:limit]
+
+@app.delete("/api/admin/logs")
+@app.post("/api/admin/logs/clear")
+def admin_clear_logs():
+    DB["logs"] = []
+    save_data()
+    return {"success": True, "message": "All telemetry logs cleared"}
+
+@app.get("/admin/logs", response_class=HTMLResponse)
+def admin_logs_web_dashboard(level: Optional[str] = None):
+    logs = DB.get("logs", [])
+    if level:
+        logs = [l for l in logs if l.get("level", "").upper() == level.upper()]
+
+    total_logs = len(DB.get("logs", []))
+    fatal_count = sum(1 for l in DB.get("logs", []) if l.get("level") == "FATAL")
+    error_count = sum(1 for l in DB.get("logs", []) if l.get("level") == "ERROR")
+    warn_count = sum(1 for l in DB.get("logs", []) if l.get("level") == "WARN")
+    info_count = sum(1 for l in DB.get("logs", []) if l.get("level") == "INFO")
+
+    rows_html = ""
+    for idx, l in enumerate(logs[:250], 1):
+        lvl = l.get("level", "INFO").upper()
+        if lvl == "FATAL":
+            badge_color = "#9333ea"
+        elif lvl == "ERROR":
+            badge_color = "#ef4444"
+        elif lvl == "WARN":
+            badge_color = "#f59e0b"
+        else:
+            badge_color = "#3b82f6"
+
+        details_str = json.dumps(l.get("details", {}), indent=2)
+        rows_html += f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">{idx}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; font-family: monospace;">{l.get('timestamp', '').replace('T', ' ')[:19]}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><span style="background: {badge_color}20; color: {badge_color}; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">{lvl}</span></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-weight: 600; font-size: 13px;">{l.get('event')}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px;"><strong>{l.get('student_id') or '-'}</strong><br><small style="color: #6b7280;">{l.get('student_name') or ''}</small></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">{l.get('device_brand', '')} {l.get('device_model', '')}<br><small style="color: #9ca3af; font-family: monospace;">{l.get('device_id', '')[:12]}...</small></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-family: monospace; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><details><summary style="cursor: pointer; color: #023c69;">View payload</summary><pre style="white-space: pre-wrap; font-size: 11px; background: #f9fafb; padding: 6px; border-radius: 4px; margin-top: 4px;">{details_str}</pre></details></td>
+        </tr>
+        """
+
+    if not rows_html:
+        rows_html = """<tr><td colspan="7" style="text-align: center; padding: 30px; color: #9ca3af;">No telemetry or error logs recorded yet. Once students interact with the app or errors occur, live logs will appear here.</td></tr>"""
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>RSML App Real-Time Telemetry & Error Monitor</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; margin: 0; padding: 24px; color: #1f2937; }}
+            .container {{ max-width: 1300px; margin: 0 auto; }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }}
+            .card {{ background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }}
+            .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }}
+            .stat-box {{ background: #fff; padding: 18px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+            .stat-val {{ font-size: 26px; font-weight: bold; margin-top: 4px; }}
+            table {{ width: 100%; border-collapse: collapse; text-align: left; }}
+            th {{ padding: 10px; background: #f9fafb; font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #e5e7eb; }}
+            .btn {{ padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; color: #fff; display: inline-block; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div>
+                    <h1 style="margin: 0; color: #023c69;">📊 Live App Telemetry & Error Monitor</h1>
+                    <p style="margin: 4px 0 0 0; color: #6b7280;">Real-time diagnostics exclusively recorded on Render (Zero college server traffic)</p>
+                </div>
+                <div>
+                    <a href="/admin/logs" class="btn" style="background: #023c69;">🔄 Refresh Feed</a>
+                    <a href="/admin/devices" class="btn" style="background: #4b5563; margin-left: 6px;">📱 Devices</a>
+                    <a href="/docs" class="btn" style="background: #6b7280; margin-left: 6px;">⚙️ API</a>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 12px; font-weight: 600;">TOTAL EVENTS</div>
+                    <div class="stat-val" style="color: #1f2937;">{total_logs}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 12px; font-weight: 600;">ERRORS</div>
+                    <div class="stat-val" style="color: #ef4444;">{error_count}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 12px; font-weight: 600;">FATAL CRASHES</div>
+                    <div class="stat-val" style="color: #9333ea;">{fatal_count}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 12px; font-weight: 600;">WARNINGS / STRIKES</div>
+                    <div class="stat-val" style="color: #f59e0b;">{warn_count}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: #6b7280; font-size: 12px; font-weight: 600;">INFO EVENTS</div>
+                    <div class="stat-val" style="color: #3b82f6;">{info_count}</div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0; overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Event Name</th>
+                            <th>Student ID</th>
+                            <th>Phone Info</th>
+                            <th>Payload & Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
 # --- Admin & Device Tracking Endpoints ---
 

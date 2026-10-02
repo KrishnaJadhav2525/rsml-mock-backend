@@ -131,9 +131,41 @@ def get_server_time():
         "iso": datetime.now(timezone.utc).isoformat()
     }
 
+# Predefined mock student accounts for multi-device practice
+MOCK_STUDENTS = {
+    "2406319": {
+        "student_id": 687,
+        "studentID": "2406319",
+        "studentname": "KARANDE HARSHAD MAHADEV",
+        "gender": "MALE",
+        "course": {"class_id": 67, "class_name": "BSC CA - III"}
+    },
+    "2406320": {
+        "student_id": 688,
+        "studentID": "2406320",
+        "studentname": "JADHAV ROHAN PRAKASH",
+        "gender": "MALE",
+        "course": {"class_id": 67, "class_name": "BSC CA - III"}
+    },
+    "2406321": {
+        "student_id": 689,
+        "studentID": "2406321",
+        "studentname": "PATIL SNEHAL SURESH",
+        "gender": "FEMALE",
+        "course": {"class_id": 67, "class_name": "BSC CA - III"}
+    }
+}
+
 @app.post("/api/mobile/auth/login")
 def student_login(payload: LoginRequest, request: Request):
     sid = payload.studentID.strip() if payload.studentID else "2406319"
+    stu_info = MOCK_STUDENTS.get(sid, {
+        "student_id": 999,
+        "studentID": sid,
+        "studentname": f"TEST STUDENT ({sid})",
+        "gender": "MALE",
+        "course": {"class_id": 67, "class_name": "BSC CA - III"}
+    })
     
     # Capture client IP (accounting for Render reverse proxies)
     client_ip = request.client.host if request.client else "unknown"
@@ -144,7 +176,7 @@ def student_login(payload: LoginRequest, request: Request):
     dev_id = (payload.deviceId or f"dev_{int(time.time())}").strip()
     now_str = datetime.now(timezone.utc).isoformat()
     
-    # Record or update phone in device tracker
+    # Record or update phone in device tracker (Multi-device enabled - ZERO lockouts)
     if "devices" not in DB:
         DB["devices"] = {}
         
@@ -152,6 +184,7 @@ def student_login(payload: LoginRequest, request: Request):
         d = DB["devices"][dev_id]
         d["last_seen"] = now_str
         d["student_id"] = sid
+        d["student_name"] = stu_info["studentname"]
         d["ip_address"] = client_ip
         d["login_count"] = d.get("login_count", 1) + 1
         d["status"] = "Active / Logged In"
@@ -159,7 +192,7 @@ def student_login(payload: LoginRequest, request: Request):
         DB["devices"][dev_id] = {
             "device_id": dev_id,
             "student_id": sid,
-            "student_name": "KARANDE HARSHAD MAHADEV",
+            "student_name": stu_info["studentname"],
             "device_brand": payload.deviceBrand or "Android Device",
             "device_model": payload.deviceModel or "Android Mobile",
             "ip_address": client_ip,
@@ -173,16 +206,7 @@ def student_login(payload: LoginRequest, request: Request):
 
     return {
         "token": f"mock_jwt_session_{sid}_{int(time.time())}",
-        "user": {
-            "student_id": 687,
-            "studentID": sid,
-            "studentname": "KARANDE HARSHAD MAHADEV",
-            "gender": "MALE",
-            "course": {
-                "class_id": 67,
-                "class_name": "BSC CA - III"
-            }
-        }
+        "user": stu_info
     }
 
 @app.post("/api/mobile/auth/logout")
@@ -214,6 +238,11 @@ def get_exam_questions(exam_id: str):
         first_key = next(iter(DB["questions"]), None)
         questions = DB["questions"][first_key] if first_key else []
     return questions
+
+@app.get("/api/online-exams/{exam_id}/responses")
+def get_exam_responses(exam_id: str, student_id: Optional[str] = None):
+    # Returns existing responses for student (or empty dict)
+    return {}
 
 @app.post("/api/online-exams/{exam_id}/submit")
 def submit_exam_responses(exam_id: str, payload: SubmitRequest):
